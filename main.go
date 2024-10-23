@@ -280,15 +280,15 @@ func (t *AugmentedTask) ExporterInformation() []*PrometheusTaskInfo {
 		}
 
 		labels := labels{
-			TaskArn:       *t.TaskArn,
-			TaskName:      *t.TaskDefinition.Family,
-			JobName:       d.DockerLabels[*prometheusJobNameLabel],
-			TaskRevision:  fmt.Sprintf("%d", t.TaskDefinition.Revision),
-			TaskGroup:     *t.Group,
-			ClusterArn:    *t.ClusterArn,
-			ContainerName: *i.Name,
-			ContainerArn:  *i.ContainerArn,
-			DockerImage:   *d.Image,
+			TaskArn: *t.TaskArn,
+			// TaskName:      *t.TaskDefinition.Family,
+			JobName: d.DockerLabels[*prometheusJobNameLabel],
+			// TaskRevision:  fmt.Sprintf("%d", t.TaskDefinition.Revision),
+			TaskGroup:  *t.Group,
+			ClusterArn: *t.ClusterArn,
+			// ContainerName: *i.Name,
+			// ContainerArn:  *i.ContainerArn,
+			// DockerImage:   *d.Image,
 		}
 
 		exporterPath, ok = d.DockerLabels[*prometheusPathLabel]
