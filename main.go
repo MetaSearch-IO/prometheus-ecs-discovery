@@ -37,15 +37,15 @@ import (
 )
 
 type labels struct {
-	TaskArn       string `yaml:"task_arn"`
-	TaskName      string `yaml:"task_name"`
-	JobName       string `yaml:"job,omitempty"`
-	TaskRevision  string `yaml:"task_revision"`
-	TaskGroup     string `yaml:"task_group"`
-	ClusterArn    string `yaml:"cluster_arn"`
-	ContainerName string `yaml:"container_name"`
-	ContainerArn  string `yaml:"container_arn"`
-	DockerImage   string `yaml:"docker_image"`
+	TaskArn       string `yaml:"task_arn,omitempty"`
+	TaskName      string `yaml:"task_name,omitempty"`
+	JobName       string `yaml:"job,omitempty,omitempty"`
+	TaskRevision  string `yaml:"task_revision,omitempty"`
+	TaskGroup     string `yaml:"task_group,omitempty"`
+	ClusterArn    string `yaml:"cluster_arn,omitempty"`
+	ContainerName string `yaml:"container_name,omitempty"`
+	ContainerArn  string `yaml:"container_arn,omitempty"`
+	DockerImage   string `yaml:"docker_image,omitempty"`
 	MetricsPath   string `yaml:"__metrics_path__,omitempty"`
 	Scheme        string `yaml:"__scheme__,omitempty"`
 }
