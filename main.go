@@ -19,8 +19,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +58,7 @@ var outFile = flag.String("config.write-to", "ecs_file_sd.yml", "path of file to
 var interval = flag.Duration("config.scrape-interval", 60*time.Second, "interval at which to scrape the AWS API for ECS service discovery information")
 var times = flag.Int("config.scrape-times", 0, "how many times to scrape before exiting (0 = infinite)")
 var roleArn = flag.String("config.role-arn", "", "ARN of the role to assume when scraping the AWS API (optional)")
+var region = flag.String("config.region", "us-west-2", "AWS region, default set to us-west-2")
 var prometheusPortLabel = flag.String("config.port-label", "PROMETHEUS_EXPORTER_PORT", "Docker label to define the scrape port of the application (if missing an application won't be scraped)")
 var prometheusPathLabel = flag.String("config.path-label", "PROMETHEUS_EXPORTER_PATH", "Docker label to define the scrape path of the application")
 var prometheusSchemeLabel = flag.String("config.scheme-label", "PROMETHEUS_EXPORTER_SCHEME", "Docker label to define the scheme of the target application")
@@ -601,7 +602,7 @@ func GetAugmentedTasks(svc *ecs.Client, svcec2 *ec2.Client, clusterArns []*strin
 func main() {
 	flag.Parse()
 
-	config, err := config.LoadDefaultConfig(context.Background())
+	cfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(*region))
 	if err != nil {
 		logError(err)
 		return
@@ -609,13 +610,13 @@ func main() {
 
 	if *roleArn != "" {
 		// Assume role
-		stsSvc := sts.NewFromConfig(config)
-		config.Credentials = stscreds.NewAssumeRoleProvider(stsSvc, *roleArn)
+		stsSvc := sts.NewFromConfig(cfg)
+		cfg.Credentials = stscreds.NewAssumeRoleProvider(stsSvc, *roleArn)
 	}
 
 	// Initialise AWS Service clients
-	svc := ecs.NewFromConfig(config)
-	svcec2 := ec2.NewFromConfig(config)
+	svc := ecs.NewFromConfig(cfg)
+	svcec2 := ec2.NewFromConfig(cfg)
 
 	work := func() {
 		var clusters *ecs.ListClustersOutput
@@ -663,7 +664,7 @@ func main() {
 			return
 		}
 		log.Printf("Writing %d discovered exporters to %s", len(infos), *outFile)
-		err = ioutil.WriteFile(*outFile, m, 0644)
+		err = os.WriteFile(*outFile, m, 0644)
 		if err != nil {
 			logError(err)
 			return
