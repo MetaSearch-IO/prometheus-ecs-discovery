@@ -16,10 +16,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -37,17 +39,17 @@ import (
 )
 
 type labels struct {
-	TaskArn       string `yaml:"task_arn,omitempty"`
-	TaskName      string `yaml:"task_name,omitempty"`
-	JobName       string `yaml:"job,omitempty,omitempty"`
-	TaskRevision  string `yaml:"task_revision,omitempty"`
-	TaskGroup     string `yaml:"task_group,omitempty"`
-	ClusterArn    string `yaml:"cluster_arn,omitempty"`
-	ContainerName string `yaml:"container_name,omitempty"`
-	ContainerArn  string `yaml:"container_arn,omitempty"`
-	DockerImage   string `yaml:"docker_image,omitempty"`
-	MetricsPath   string `yaml:"__metrics_path__,omitempty"`
-	Scheme        string `yaml:"__scheme__,omitempty"`
+	TaskArn       string `yaml:"task_arn,omitempty" json:"task_arn,omitempty"`
+	TaskName      string `yaml:"task_name,omitempty" json:"task_name,omitempty"`
+	JobName       string `yaml:"job,omitempty,omitempty" json:"job,omitempty"`
+	TaskRevision  string `yaml:"task_revision,omitempty" json:"task_revision,omitempty"`
+	TaskGroup     string `yaml:"task_group,omitempty" json:"task_group,omitempty"`
+	ClusterArn    string `yaml:"cluster_arn,omitempty" json:"cluster_arn,omitempty"`
+	ContainerName string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	ContainerArn  string `yaml:"container_arn,omitempty" json:"container_arn,omitempty"`
+	DockerImage   string `yaml:"docker_image,omitempty" json:"docker_image,omitempty"`
+	MetricsPath   string `yaml:"__metrics_path__,omitempty" json:"__metrics_path__,omitempty"`
+	Scheme        string `yaml:"__scheme__,omitempty" json:"__scheme__,omitempty"`
 }
 
 // Docker label for enabling dynamic port detection
@@ -66,6 +68,7 @@ var prometheusFilterLabel = flag.String("config.filter-label", "", "Docker label
 var prometheusServerNameLabel = flag.String("config.server-name-label", "PROMETHEUS_EXPORTER_SERVER_NAME", "Docker label to define the server name")
 var prometheusJobNameLabel = flag.String("config.job-name-label", "PROMETHEUS_EXPORTER_JOB_NAME", "Docker label to define the job name")
 var prometheusDynamicPortDetection = flag.Bool("config.dynamic-port-detection", false, fmt.Sprintf("If true, only tasks with the Docker label %s=1 will be scraped", dynamicPortLabel))
+var listenPort = flag.Int("config.listen-port", 80, "Port to listen on for prometheus targets sd files information")
 
 // logError is a convenience function that decodes all possible ECS
 // errors and displays them to standard error.
@@ -121,8 +124,8 @@ type PrometheusContainer struct {
 // PrometheusTaskInfo is the final structure that will be
 // output as a Prometheus file service discovery config.
 type PrometheusTaskInfo struct {
-	Targets []string `yaml:"targets"`
-	Labels  labels   `yaml:"labels"`
+	Targets []string `yaml:"targets" json:"targets"`
+	Labels  labels   `yaml:"labels" json:"labels"`
 }
 
 // ExporterInformation returns a list of []*PrometheusTaskInfo
@@ -599,6 +602,19 @@ func GetAugmentedTasks(svc *ecs.Client, svcec2 *ec2.Client, clusterArns []*strin
 	return tasks, nil
 }
 
+func startHttpServer(listenPort int) {
+	http.HandleFunc("/targets.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "targets.json")
+	})
+
+	fmt.Printf("Starting HTTP server on port %d\n", listenPort)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", listenPort), nil)
+	if err != nil {
+		fmt.Println("HTTP server error:", err)
+		os.Exit(1)
+	}
+}
+
 func main() {
 	flag.Parse()
 
@@ -607,6 +623,8 @@ func main() {
 		logError(err)
 		return
 	}
+
+	go startHttpServer(*listenPort)
 
 	if *roleArn != "" {
 		// Assume role
@@ -665,6 +683,18 @@ func main() {
 		}
 		log.Printf("Writing %d discovered exporters to %s", len(infos), *outFile)
 		err = os.WriteFile(*outFile, m, 0644)
+		if err != nil {
+			logError(err)
+			return
+		}
+
+		// Write to targets.json for HTTP server
+		jsonData, err := json.Marshal(infos)
+		if err != nil {
+			logError(err)
+			return
+		}
+		err = os.WriteFile("targets.json", jsonData, 0644)
 		if err != nil {
 			logError(err)
 			return
